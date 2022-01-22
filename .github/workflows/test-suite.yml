@@ -1,0 +1,156 @@
+name: Test Suite
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+
+jobs:
+  Code-Climate-Tests:
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:5.7
+        env:
+          MYSQL_DATABASE: sessiontome
+          MYSQL_USER: application
+          MYSQL_PASSWORD: secret
+          MYSQL_ROOT_PASSWORD: secretroot
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Cache dependencies
+        uses: actions/cache@v1
+        with:
+          path: ~/.composer/cache/files
+          key: dependencies-laravel-8.x-php-8.0-composer-${{ hashFiles('composer.json') }}
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.0
+          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, bcmath, soap, intl, gd, exif, iconv, imagick
+          coverage: xdebug
+
+      - name: Configure Composer
+        run: |
+          composer install -n --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist
+
+      - name: Setup Node
+        uses: actions/setup-node@v2
+        with:
+          node-version: 14
+          cache: yarn
+
+      - name: Build Front-End Assets
+        run: |
+          yarn install
+          yarn prod
+
+      - name: Run PHPUnit
+        env:
+          DB_PORT: ${{ job.services.mysql.ports[3306] }}
+        run: ./vendor/bin/phpunit --coverage-clover tests/coverage.xml
+
+      - name: Run Jest
+        run: yarn jest --coverage
+
+      - name: Publish reports to Code Climate
+        uses: paambaati/codeclimate-action@v2.7.5
+        env:
+          CC_TEST_REPORTER_ID: ${{ secrets.CC_REPORTER_ID }}
+        with:
+          coverageLocations: |
+            tests/coverage.xml:clover
+            coverage/clover.xml:clover
+
+      - name: Copy .env file
+        run: php -r "file_exists('.env') || copy('.env.testing', '.env');"
+
+      - name: Migrate Database
+        env:
+          DB_PORT: ${{ job.services.mysql.ports[3306] }}
+        run: php artisan migrate --force
+
+      - name: Fix directory cache and permission
+        run: rm -rf storage/framework/cache/* && chmod -R 777 storage
+
+      - name: Serve Site
+        run: php artisan serve > /dev/null 2>&1 &
+
+      - name: Run E2E Test Suite with Cypress
+        uses: cypress-io/github-action@v2
+        with:
+          browser: chrome
+          install: false
+          wait-on: http://localhost:8000
+          config: baseUrl=http://localhost:8000
+
+      - name: Upload Cypress Images
+        uses: actions/upload-artifact@master
+          # there might be no screenshots created when:
+          # - there are no test failures
+          # so only upload screenshots if previous step has failed
+        if: failure()
+        with:
+          name: screenshots
+          path: cypress/screenshots
+
+        # video should always be generated
+      - name: Upload Cypress Videos
+        uses: actions/upload-artifact@master
+        with:
+          name: videos
+          path: cypress/videos
+
+  Psalm:
+    name: Psalm
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.0
+          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, bcmath, soap, intl, gd, exif, iconv, imagick
+          coverage: xdebug
+
+      - name: Cache dependencies
+        uses: actions/cache@v1
+        with:
+          path: ~/.composer/cache/files
+          key: dependencies-laravel-8.x-php-8.0-composer-${{ hashFiles('composer.json') }}
+
+      - name: Configure Composer
+        run: |
+          composer install -n --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist
+
+      - name: Run psalm
+        run: ./vendor/bin/psalm
+
+  sonarcloud:
+    name: sonarcloud
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+
+    - name: SonarCloud Scan
+      uses: SonarSource/sonarcloud-github-action@v1.6
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+

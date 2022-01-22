@@ -1,0 +1,34 @@
+{
+    "compilerOptions": {
+        "target": "es5",
+        "lib": ["es5", "dom", "dom.iterable", "esnext"],
+        "allowJs": true,
+        "skipLibCheck": true,
+        "esModuleInterop": true,
+        "allowSyntheticDefaultImports": true,
+        "strict": true,
+        "forceConsistentCasingInFileNames": true,
+        "noFallthroughCasesInSwitch": true,
+        "module": "esnext",
+        "moduleResolution": "node",
+        "resolveJsonModule": true,
+        "isolatedModules": false,
+        "noEmit": false,
+        "jsx": "react",
+        "baseUrl": "./",
+        "paths": {
+            "@": ["resources/js/*"],
+            "Components": ["resources/js/Components"],
+            "Layouts": ["resources/js/Layouts"],
+            "Pages": ["resources/js/Pages"],
+            "Utils": ["resources/js/Utils"],
+            "Icons/*": ["resources/icons/*"],
+            "Images/*": ["resources/images/*"],
+            "Mock/*": ["resources/mock/*"],
+            "Types/*": ["resources/js/Types/*"],
+            "hoc/*": ["resources/js/hoc/*"]
+        }
+    },
+    "include": ["./resources", "**/*.ts", "./custom.d.ts"],
+    "exclude": ["node_modules", "resources/**/*.js"]
+}
